@@ -1,95 +1,134 @@
 import 'package:flutter/material.dart';
+import 'home_screen.dart';
+import 'secondpage.dart'; // Replace with your actual filename
 
 void main() {
-  runApp(const MyApp());
+  runApp(const WorkoutApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key}); // super()
+class WorkoutApp extends StatelessWidget {
+  const WorkoutApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Workout Tracker',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 61, 255, 2)),
+        primarySwatch: Colors.green,
+        useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
+  const MyHomePage({super.key});
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-  List<Widget> _dynamicButtons = []; //List to store buttons
+  final List<Map<String, dynamic>> _storedData = [];
 
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
+  void _showInputDialogWithPreset(BuildContext context, String selectedExercise) {
 
-  void _addButton() {
-    setState(() {
-      _dynamicButtons.add(
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _showInputDialog, // Opens input dialog
-            child: Text("New Button ${_dynamicButtons.length + 1}"),
-          ),
-        ),
-      );
-    });
-  }
+    final List<TextEditingController> weightControllers = [TextEditingController()];
+    final List<TextEditingController> repsControllers = [TextEditingController()];
 
-  void _showInputDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        TextEditingController textController = TextEditingController();
-        TextEditingController numberController = TextEditingController();
-
-        return AlertDialog(
-          title: Text("Enter Data"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: textController,
-                decoration: InputDecoration(labelText: "Enter text"),
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: Text("Log: $selectedExercise"),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: weightControllers.length,
+                      itemBuilder: (context, index) {
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: weightControllers[index],
+                                decoration: InputDecoration(labelText: "Set ${index + 1} - Weight (kg)"),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: repsControllers[index],
+                                decoration: InputDecoration(labelText: "Set ${index + 1} - Reps"),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  weightControllers.removeAt(index);
+                                  repsControllers.removeAt(index);
+                                });
+                              },
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            weightControllers.add(TextEditingController());
+                            repsControllers.add(TextEditingController());
+                          });
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text("Add Set"),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              TextField(
-                controller: numberController,
-                decoration: InputDecoration(labelText: "Enter number"),
-                keyboardType: TextInputType.number,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final sets = <Map<String, dynamic>>[];
+                  for (int i = 0; i < weightControllers.length; i++) {
+                    final weight = double.tryParse(weightControllers[i].text) ?? 0.0;
+                    final reps = int.tryParse(repsControllers[i].text) ?? 0;
+                    sets.add({"weight": weight, "reps": reps});
+                  }
+                  setState(() {
+                    _storedData.add({
+                      "exercise": selectedExercise,
+                      "sets": sets,
+                      "timestamp": DateTime.now(),
+                    });
+                  });
+                  Navigator.of(context).pop();
+                },
+                child: const Text("Save"),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-              },
-              child: Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                print("Text: ${textController.text}, Number: ${numberController.text}");
-                Navigator.of(context).pop(); // Close dialog after saving
-              },
-              child: Text("Submit"),
-            ),
-          ],
         );
       },
     );
@@ -97,43 +136,16 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Column( // Change from Center to Column
-        children: <Widget>[
-          Expanded(
-            child: SingleChildScrollView( // Allows scrolling
-              child: Column(
-                children: _dynamicButtons,
-                ),
-            ),
+    return HomeScreen(
+      onLogWorkout: _showInputDialogWithPreset,
+      onViewHistory: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SecondPage(storedData: _storedData),
           ),
-      ],
-    ),
-    floatingActionButton: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween, // Places buttons at opposite sides
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 16.0), // Aligns left button properly
-          child: ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _counter = 0; // Resets counter
-              });
-            },
-            child: Text("Reset"),
-          ),
-        ),
-        FloatingActionButton(
-          onPressed: _addButton,
-          tooltip: 'Add Button',
-          child: const Icon(Icons.add),
-        ),
-      ],
-    ),
-  );
-}
+        );
+      },
+    );
+  }
 }
