@@ -137,7 +137,7 @@ class _LogWorkoutDialogState extends State<LogWorkoutDialog> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),//.toList(),
                       const Divider(height: 20),
                     ],
                   ),

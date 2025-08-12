@@ -1,36 +1,50 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'home_screen.dart';
-import 'secondpage.dart';
-import 'log_workout_dialog.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-// The main entry point for the entire application.
-void main() {
+import 'auth_gate.dart';
+import 'home_screen.dart';
+import 'WorkoutHistoryPage.dart';
+import 'log_workout_dialog.dart';
+import 'add_exercise_dialog.dart';
+import 'workout_data.dart';
+
+/// The main entry point for the entire application.
+Future<void> main() async {
+  // This ensures that all Flutter bindings are initialized before any Flutter code runs.
+  WidgetsFlutterBinding.ensureInitialized();
+  // This initializes the Firebase app using the keys from your firebase_options.dart file.
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const WorkoutApp());
 }
 
-// The root widget of the application.
-// It sets up the MaterialApp, which defines the app's title, theme, and home screen.
+/// The root widget of the application.
+/// It sets up the MaterialApp, which defines the app's title, theme, and home screen.
 class WorkoutApp extends StatelessWidget {
   const WorkoutApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Workout Tracker',
+      title: 'Lift Log',
       theme: ThemeData(
         primarySwatch: Colors.green,
         useMaterial3: true,
       ),
-      home: const MyHomePage(),
+      // The AuthGate handles showing either the LoginScreen or MyHomePage.
+      home: const AuthGate(),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
-// The main stateful widget that acts as the "brain" of the app.
-// It manages the app's core data and state.
+/// The main stateful widget that acts as the "brain" of the app.
+/// It manages the app's core data and state after a user has logged in.
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
@@ -43,11 +57,11 @@ class _MyHomePageState extends State<MyHomePage> {
   // State Variables
   // ===========================================================================
 
-  /// The master list of all saved workout entries. This is the "source of truth".
+  /// The master list of all saved workout entries for the current user.
   List<Map<String, dynamic>> _storedData = [];
-
-  /// A map to temporarily store data from a dialog if the user closes it
-  /// without saving. This prevents them from losing their input.
+  /// The nested map of all available exercises for the current user.
+  Map<String, Map<String, List<Map<String, String>>>> _exerciseData = {};
+  /// A map to temporarily store data from a dialog if the user closes it without saving.
   final Map<String, List<SetEntry>> _tempWorkoutData = {};
 
   // ===========================================================================
@@ -57,27 +71,28 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    // Load any saved workouts from the device when the app starts.
+    // Load the user's data from Firestore when the app starts.
+    _loadExercises();
     _loadWorkouts();
   }
 
   // ===========================================================================
-  // Data Persistence
+  // Data Persistence (Cloud Firestore)
   // ===========================================================================
 
-  /// Loads workout data from the phone's local storage.
+  /// Loads the user's workout logs from Firestore.
   Future<void> _loadWorkouts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? workoutsString = prefs.getString('workout_data');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    if (workoutsString != null) {
-      // If data exists, decode it from a JSON string into a Dart List.
-      final List<dynamic> decodedData = jsonDecode(workoutsString);
+    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    
+    if (doc.exists && doc.data()!.containsKey('workouts')) {
+      final List<dynamic> workoutData = doc.data()!['workouts'];
       setState(() {
-        _storedData = decodedData.map((item) {
+        _storedData = workoutData.map((item) {
           final entry = item as Map<String, dynamic>;
-          // Convert the stored timestamp string back into a DateTime object.
-          entry['timestamp'] = DateTime.parse(entry['timestamp'] as String);
+          entry['timestamp'] = (entry['timestamp'] as Timestamp).toDate();
           entry['sets'] = (entry['sets'] as List)
               .map((s) => s as Map<String, dynamic>)
               .toList();
@@ -85,44 +100,76 @@ class _MyHomePageState extends State<MyHomePage> {
         }).toList();
       });
     } else {
-      // If no data is found (e.g., first time running the app), load test data.
+      // If no data exists, load the mock data as a starting point.
       setState(() {
-        _storedData = _generateTestData();
       });
     }
   }
 
-  /// Saves the current workout data to the phone's local storage.
+  /// Saves the user's workout logs to Firestore.
   Future<void> _saveWorkouts() async {
-    final prefs = await SharedPreferences.getInstance();
-    // Create a copy of the data that can be safely encoded into JSON.
-    final List<Map<String, dynamic>> encodableData = _storedData.map((item) {
-      final encodableItem = Map<String, dynamic>.from(item);
-      // Convert DateTime objects into a string format for JSON compatibility.
-      encodableItem['timestamp'] =
-          (encodableItem['timestamp'] as DateTime).toIso8601String();
-      return encodableItem;
-    }).toList();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    // Encode the list into a JSON string and save it.
-    final String workoutsString = jsonEncode(encodableData);
-    await prefs.setString('workout_data', workoutsString);
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'workouts': _storedData,
+    }, SetOptions(merge: true));
+  }
+
+  /// Loads the user's custom exercise list from Firestore.
+  Future<void> _loadExercises() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+
+    setState(() {
+      if (doc.exists && doc.data()!.containsKey('exercises')) {
+        final Map<String, dynamic> decodedData = doc.data()!['exercises'];
+        _exerciseData = decodedData.map((mainGroup, subGroups) {
+          final subGroupMap = (subGroups as Map<String, dynamic>).map((subGroup, exercises) {
+            final exerciseList = (exercises as List)
+                .map((e) => Map<String, String>.from(e))
+                .toList();
+            return MapEntry(subGroup, exerciseList);
+          });
+          return MapEntry(mainGroup, subGroupMap);
+        });
+      } else {
+        // If no saved list exists, load the default and save it.
+        _exerciseData = workoutData;
+        _saveExercises();
+      }
+    });
+  }
+
+  /// Saves the user's custom exercise list to Firestore.
+  Future<void> _saveExercises() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'exercises': _exerciseData,
+    }, SetOptions(merge: true));
   }
 
   // ===========================================================================
   // Dialog and Action Handlers
   // ===========================================================================
 
+  /// Signs the current user out.
+  Future<void> _signOut() async {
+    await FirebaseAuth.instance.signOut();
+  }
+  
   /// Shows the dialog for logging a NEW workout.
   void _showInputDialogWithPreset(
       BuildContext context, String selectedExercise) {
-    // Find the 3 most recent entries for this exercise to show as history.
     final recentEntries = _storedData
         .where((entry) => entry['exercise'] == selectedExercise)
         .take(3)
         .toList();
 
-    // Get any temporary (unsaved) data for this exercise.
     final tempSets = _tempWorkoutData[selectedExercise] ?? [SetEntry("", "")];
     if (tempSets.isEmpty) {
       tempSets.add(SetEntry("", ""));
@@ -136,13 +183,11 @@ class _MyHomePageState extends State<MyHomePage> {
           initialData: tempSets,
           recentHistory: recentEntries,
           onDispose: (currentData) {
-            // If the dialog is closed without saving, store the input temporarily.
             setState(() {
               _tempWorkoutData[selectedExercise] = currentData;
             });
           },
           onSave: (savedSets) {
-            // When the user saves, process the sets and add a new entry.
             final sets = <Map<String, dynamic>>[];
             for (final setEntry in savedSets) {
               final weight = double.tryParse(setEntry.weight) ?? 0.0;
@@ -154,7 +199,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
             if (sets.isNotEmpty) {
               setState(() {
-                // Create a new list to ensure the state change is detected by other widgets.
                 final newList = List<Map<String, dynamic>>.from(_storedData);
                 newList.add({
                   "exercise": selectedExercise,
@@ -166,12 +210,10 @@ class _MyHomePageState extends State<MyHomePage> {
                 _saveWorkouts();
               });
             } else {
-              // If the user saved with no data, just clear the temp data.
               setState(() {
                 _tempWorkoutData.remove(selectedExercise);
               });
             }
-            // Close the dialog after saving.
             Navigator.of(context).pop();
           },
         );
@@ -180,13 +222,11 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   /// Shows the dialog for EDITING a saved workout.
-  /// Returns the updated entry so the history page UI can refresh instantly.
   Future<Map<String, dynamic>?> _showEditDialog(Map<String, dynamic> entryToEdit) async {
     final int indexToEdit = _storedData.indexOf(entryToEdit);
     if (indexToEdit == -1) return null;
 
     final String exerciseName = entryToEdit['exercise'] as String;
-    // Convert the stored data back into a format the dialog can use.
     final List<SetEntry> initialSets = (entryToEdit['sets'] as List)
         .map((s) => SetEntry(s['weight'].toString(), s['reps'].toString()))
         .toList();
@@ -198,7 +238,7 @@ class _MyHomePageState extends State<MyHomePage> {
           exerciseName: exerciseName,
           initialData: initialSets,
           recentHistory: null,
-          onDispose: (data) {}, // No need to save temp data on edit.
+          onDispose: (data) {},
           onSave: (savedSets) {
             final sets = <Map<String, dynamic>>[];
             for (final setEntry in savedSets) {
@@ -213,18 +253,15 @@ class _MyHomePageState extends State<MyHomePage> {
               final newEntry = {
                 "exercise": exerciseName,
                 "sets": sets,
-                "timestamp": entryToEdit['timestamp'], // Keep original timestamp
+                "timestamp": entryToEdit['timestamp'],
               };
 
               setState(() {
-                // Replace the item at its index in a new list.
                 final newList = List<Map<String, dynamic>>.from(_storedData);
                 newList[indexToEdit] = newEntry;
                 _storedData = newList;
                 _saveWorkouts();
               });
-
-              // Return the updated data and close the dialog.
               Navigator.of(context).pop(newEntry);
             } else {
               Navigator.of(context).pop(null);
@@ -237,7 +274,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   /// Shows a confirmation dialog for DELETING a workout.
-  /// Returns true/false so the history page knows whether to update its UI.
   Future<bool> _confirmDelete(Map<String, dynamic> entryToDelete) async {
     final bool? wasConfirmed = await showDialog(
       context: context,
@@ -249,19 +285,16 @@ class _MyHomePageState extends State<MyHomePage> {
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop(false); // Return false
-              },
+              onPressed: () => Navigator.of(context).pop(false),
             ),
             TextButton(
               child: const Text('Delete', style: TextStyle(color: Colors.red)),
               onPressed: () {
                 setState(() {
-                  // Create a new list without the deleted item.
                   _storedData = List.from(_storedData)..remove(entryToDelete);
                   _saveWorkouts();
                 });
-                Navigator.of(context).pop(true); // Return true
+                Navigator.of(context).pop(true);
               },
             ),
           ],
@@ -269,6 +302,73 @@ class _MyHomePageState extends State<MyHomePage> {
       },
     );
     return wasConfirmed ?? false;
+  }
+
+  /// Shows the "Add Exercise" dialog.
+  void _showAddExerciseDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AddExerciseDialog(
+          exerciseData: _exerciseData,
+          onSave: _addExercise,
+        );
+      },
+    );
+  }
+
+  /// Adds a new custom exercise to the user's list.
+  void _addExercise(String name, String mainGroup, String subGroup) {
+    setState(() {
+      final newExerciseData = Map<String, Map<String, List<Map<String, String>>>>.from(_exerciseData);
+      newExerciseData[mainGroup]?[subGroup]?.add({'name': name});
+      _exerciseData = newExerciseData;
+      _saveExercises();
+    });
+  }
+
+  /// Deletes a single exercise from the user's list.
+  void _deleteExercise(String mainGroup, String subGroup, String exerciseName) {
+    setState(() {
+      final newExerciseData = Map<String, Map<String, List<Map<String, String>>>>.from(_exerciseData);
+      final exerciseList = newExerciseData[mainGroup]?[subGroup];
+      exerciseList?.removeWhere((exercise) => exercise['name'] == exerciseName);
+      _exerciseData = newExerciseData;
+      _saveExercises();
+    });
+  }
+
+  /// Shows a confirmation dialog for deleting an entire category.
+  Future<void> _confirmDeleteCategory(String mainGroup, String subGroup) async {
+    final bool? wasConfirmed = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete "$subGroup"?'),
+          content: Text(
+              'Are you sure you want to delete the "$subGroup" category and all of its exercises? This cannot be undone.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+            TextButton(
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onPressed: () => Navigator.of(context).pop(true),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (wasConfirmed == true) {
+      setState(() {
+        final newExerciseData = Map<String, Map<String, List<Map<String, String>>>>.from(_exerciseData);
+        newExerciseData[mainGroup]?.remove(subGroup);
+        _exerciseData = newExerciseData;
+        _saveExercises();
+      });
+    }
   }
 
   // ===========================================================================
@@ -280,13 +380,13 @@ class _MyHomePageState extends State<MyHomePage> {
     // The main UI is delegated to the HomeScreen widget.
     // This keeps the state management logic separate from the UI code.
     return HomeScreen(
+      exerciseData: _exerciseData,
       onLogWorkout: _showInputDialogWithPreset,
       onViewHistory: () {
-        // Navigate to the history page, passing the current data and action handlers.
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => SecondPage(
+            builder: (_) => WorkoutHistoryPage(
               storedData: _storedData,
               onEdit: _showEditDialog,
               onDelete: _confirmDelete,
@@ -294,59 +394,10 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         );
       },
+      onAddExercise: _showAddExerciseDialog,
+      onDeleteCategory: _confirmDeleteCategory,
+      onDeleteExercise: _deleteExercise,
+      onSignOut: _signOut,
     );
-  }
-
-  // ===========================================================================
-  // Test Data Generator
-  // ===========================================================================
-
-  /// A helper function for development to provide initial data.
-  List<Map<String, dynamic>> _generateTestData() {
-    final now = DateTime.now();
-    return [
-      {
-        "exercise": "Bench Press",
-        "timestamp": now.subtract(const Duration(days: 14)),
-        "sets": [
-          {"weight": 70.0, "reps": 8},
-          {"weight": 70.0, "reps": 8},
-        ],
-      },
-      {
-        "exercise": "Bench Press",
-        "timestamp": now.subtract(const Duration(days: 7)),
-        "sets": [
-          {"weight": 75.0, "reps": 6},
-          {"weight": 75.0, "reps": 6},
-          {"weight": 75.0, "reps": 5},
-        ],
-      },
-      {
-        "exercise": "Squat",
-        "timestamp": now.subtract(const Duration(days: 5)),
-        "sets": [
-          {"weight": 100.0, "reps": 5},
-          {"weight": 100.0, "reps": 5},
-        ],
-      },
-      {
-        "exercise": "Bench Press",
-        "timestamp": now.subtract(const Duration(days: 1)),
-        "sets": [
-          {"weight": 80.0, "reps": 5},
-          {"weight": 80.0, "reps": 4},
-          {"weight": 80.0, "reps": 4},
-        ],
-      },
-      {
-        "exercise": "Pull-ups",
-        "timestamp": now,
-        "sets": [
-          {"weight": 0.0, "reps": 10},
-          {"weight": 0.0, "reps": 8},
-        ],
-      },
-    ];
   }
 }
