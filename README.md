@@ -1,4 +1,4 @@
-# flutter_application_1
+# Lift Log Application
 
 A new Flutter project.
 
