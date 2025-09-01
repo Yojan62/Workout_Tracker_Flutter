@@ -1,0 +1,35 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# Flutter/Dart/Pub related
+.dart_tool/
+.packages
+.pub-cache/
+/build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Android related
+/android/app/build/
+/android/build/
+/android/.gradle/
+/android/key.properties
+/android/local.properties
+/android/**/GeneratedPluginRegistrant.java
+
+# iOS related
+/ios/Pods/
+/ios/Flutter/App.framework
+/ios/Flutter/engine.version
+/ios/Flutter/flutter_export_environment.sh
+/ios/.symlinks/
+/ios/Runner/GeneratedPluginRegistrant.h
+/ios/Runner/GeneratedPluginRegistrant.m
