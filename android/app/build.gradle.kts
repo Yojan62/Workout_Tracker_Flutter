@@ -36,7 +36,7 @@ android {
         applicationId = "com.example.flutter_application_1"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -49,21 +49,22 @@ android {
         doNotStrip("*/x86_64/*.so")
     }
 
-    signingConfigs {
-        create("release") {
-            if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-            }
-        }
-    }
-
     buildTypes {
         getByName("release") {
             // This is the correct way to assign the signing config in Kotlin
-            signingConfig = signingConfigs.getByName("release")
+            //signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
+    
+    applicationVariants.all {
+        outputs.all {
+            val variantName = name // e.g. "debug", "release", "profile"
+            val newDir = File("${project.buildDir}/outputs/flutter-apk")
+            newDir.mkdirs()
+            val newApk = File(newDir, "app-$variantName.apk")
+
+            (this as com.android.build.gradle.api.ApkVariantOutput)
         }
     }
 }
