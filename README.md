@@ -38,4 +38,4 @@ A full-stack workout tracker application built with Flutter and Firebase. This a
 - **Frontend:** Flutter
 - **Backend & Database:** Firebase (Authentication & Cloud Firestore)
 - **State Management:** `StatefulWidget` with `setState`
-- **Packages:** `firebase_auth`, `cloud_firestore`, `intl`, `shared_preferences`
+- **Packages:** `firebase_auth`, `cloud_firestore`, `intl`
