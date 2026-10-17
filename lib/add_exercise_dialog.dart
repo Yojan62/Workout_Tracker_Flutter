@@ -67,7 +67,7 @@ class _AddExerciseDialogState extends State<AddExerciseDialog> {
 
           // Dropdown 1: Main Group (e.g., "UPPER BODY")
           DropdownButtonFormField<String>(
-            value: _selectedMainGroup,
+            initialValue: _selectedMainGroup,
             decoration: const InputDecoration(labelText: "Main Group"),
             items: widget.exerciseData.keys.map((String group) {
               return DropdownMenuItem<String>(
@@ -90,7 +90,7 @@ class _AddExerciseDialogState extends State<AddExerciseDialog> {
 
           // Dropdown 2: Muscle Sub-Group (e.g., "Chest")
           DropdownButtonFormField<String>(
-            value: _selectedSubGroup,
+            initialValue: _selectedSubGroup,
             decoration: const InputDecoration(labelText: "Muscle Group"),
             // The items for this dropdown are dynamically generated from subGroupOptions.
             items: subGroupOptions.map((String group) {

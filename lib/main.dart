@@ -7,7 +7,7 @@ import 'firebase_options.dart';
 import 'app_theme.dart';
 import 'auth_gate.dart';
 import 'home_screen.dart';
-import 'WorkoutHistoryPage.dart';
+import 'workout_history_page.dart';
 import 'account_screen.dart';
 import 'log_workout_dialog.dart';
 import 'add_exercise_dialog.dart';

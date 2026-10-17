@@ -120,15 +120,18 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    // Capture the messenger before the await so it isn't looked up from a
+    // context that may have been disposed while the request was in flight.
+    final messenger = ScaffoldMessenger.of(context);
     try {
       // Tell Firebase to send a password reset email to the given address.
       await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text.trim());
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('A password reset link has been sent to your email.')),
       );
     } on FirebaseAuthException catch (e) {
       // Handle errors, e.g., if the user doesn't exist.
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text(e.message ?? 'An error occurred.')),
       );
     }

@@ -18,7 +18,6 @@ class AppTheme {
     colorScheme: ColorScheme.fromSeed(
       seedColor: _seedColor,
       brightness: Brightness.light,
-      background: const Color(0xFFF5F5F5), // A custom, slightly off-white background
     ),
     // Defines the default style for all AppBars in the app.
     appBarTheme: AppBarTheme(
@@ -43,7 +42,6 @@ class AppTheme {
     colorScheme: ColorScheme.fromSeed(
       seedColor: _seedColor,
       brightness: Brightness.dark,
-      background: const Color(0xFF121212), // A standard dark mode background
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: ColorScheme.fromSeed(seedColor: _seedColor, brightness: Brightness.dark).primaryContainer,

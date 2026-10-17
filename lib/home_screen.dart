@@ -98,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen>
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(kToolbarHeight),
           child: Container(
-            color: Theme.of(context).colorScheme.surfaceVariant,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             child: TabBar(
               controller: _tabController,
               isScrollable: true, // Switched back to true to handle many categories

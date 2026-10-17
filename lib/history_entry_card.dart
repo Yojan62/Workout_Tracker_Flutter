@@ -52,7 +52,7 @@ class _HistoryEntryCardState extends State<HistoryEntryCard> {
     final weight = (bestSet['weight'] as num?)?.toDouble() ?? 0.0;
     final reps = (bestSet['reps'] as num?)?.toInt() ?? 0;
 
-    return "${weight}kg x ${reps}";
+    return "${weight}kg x $reps";
   }
 
   @override
@@ -135,7 +135,7 @@ class _HistoryEntryCardState extends State<HistoryEntryCard> {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 // Use a theme-aware color for readability in light/dark mode.
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center),
         );
@@ -150,7 +150,7 @@ class _HistoryEntryCardState extends State<HistoryEntryCard> {
         final reps = set["reps"] ?? 0;
         return Expanded(
           child: Text(
-            "${weight}kg x ${reps}",
+            "${weight}kg x $reps",
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurface,
