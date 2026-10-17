@@ -6,14 +6,9 @@ A full-stack workout tracker application built with Flutter and Firebase. This a
 
 ## 📸 Screenshots
 
-| Login Screen | 
-| <img src="Pictures/LoginPage.jpg" width="250" /> |
-
-| Home Screen |
-| ![Home Screen](https://github.com/user-attachments/assets/4695a2dc-59a9-4770-a1b5-69a5e5ad5868) |
-
-| History Page |
-| ![History Page](https://github.com/user-attachments/assets/a57d5028-a803-4a05-9f3c-0026cbee5330) |
+| Login Screen | Home Screen | History Page |
+| :---: | :---: | :---: |
+| <img src="assets/LoginPage.jpg" alt="Login screen" width="250" /> | <img src="assets/HomeScreen.jpg" alt="Home screen" width="250" /> | <img src="assets/HistoryPage.jpg" alt="History page" width="250" /> |
 
 
 ---
